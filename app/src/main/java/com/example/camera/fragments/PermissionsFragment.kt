@@ -2,31 +2,28 @@ package com.example.camera.fragments
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
 import androidx.fragment.app.Fragment
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
+import androidx.navigation.fragment.findNavController
 import com.example.camera.R
+import kotlinx.coroutines.launch
 
 /**
  * The purpose of this fragment is to request permissions, once use granted
  * permissions, then navigate to camera fragment.
  */
-class PermissionsFragment() : Fragment() {
+class PermissionsFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!hasPermissions(requireContext())) {
             // Request for permissions
-            requestPermissions(PERMISSION_REQUEST, PERMISSION_REQUEST_CODE)
+            requestPermissions(PERMISSIONS_REQUEST, PERMISSIONS_REQUEST_CODE)
         } else {
             // Already has permissions, navigate to camera fragment
             navigateToCamera()
@@ -39,7 +36,7 @@ class PermissionsFragment() : Fragment() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_CODE) {
+        if (requestCode == PERMISSIONS_REQUEST_CODE) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(requireContext(), "Permission request granted.", Toast.LENGTH_LONG)
                     .show()
@@ -54,6 +51,11 @@ class PermissionsFragment() : Fragment() {
 
     // Navigate to camera fragment
     private fun navigateToCamera() {
+
+        // I think don't need to launch a coroutine to navigate to camera fragment, just call it as normal
+        //findNavController().navigate(PermissionsFragmentDirections.actionPermissionsFragmentToCameraFragment())
+
+        // todo: learning different between lifecycleScope.launchWhen...
         lifecycleScope.launchWhenStarted {
             Navigation.findNavController(requireActivity(), R.id.nav_host_fragment)
                 .navigate(PermissionsFragmentDirections.actionPermissionsFragmentToCameraFragment())
@@ -62,11 +64,11 @@ class PermissionsFragment() : Fragment() {
 
     companion object {
 
-        private val PERMISSION_REQUEST = arrayOf(Manifest.permission.CAMERA)
-        private const val PERMISSION_REQUEST_CODE = 1
+        private val PERMISSIONS_REQUEST = arrayOf(Manifest.permission.CAMERA)
+        private const val PERMISSIONS_REQUEST_CODE = 1
 
         // Check if all permissions granted
-        fun hasPermissions(context: Context) = PERMISSION_REQUEST.all {
+        fun hasPermissions(context: Context) = PERMISSIONS_REQUEST.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
     }

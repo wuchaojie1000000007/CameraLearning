@@ -14,8 +14,8 @@
 
     <ImageButton
         android:id="@+id/switch_button"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
         android:layout_marginBottom="100dp"
         android:background="@null"
         android:scaleType="centerCrop"
@@ -26,8 +26,8 @@
 
     <ImageButton
         android:id="@+id/capture_button"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
         android:layout_marginBottom="100dp"
         android:background="@null"
         android:scaleType="centerCrop"
@@ -37,13 +37,13 @@
         app:layout_constraintRight_toRightOf="parent" />
 
     <ImageButton
-        android:id="@+id/gallery_button"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+        android:id="@+id/thumbnail"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
         android:layout_marginBottom="100dp"
         android:background="@null"
         android:scaleType="centerCrop"
-        android:src="@drawable/ic_gallery"
+        android:src="@drawable/ic_thumbnail"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toRightOf="@+id/capture_button"
         app:layout_constraintRight_toRightOf="parent" />

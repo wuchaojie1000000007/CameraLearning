@@ -3,6 +3,9 @@ buildscript {
     ext.kotlin_version = "1.4.32"
     ext.camerax_version = "1.0.0"
     ext.nav_version = "2.3.5"
+    ext.glide_version = "4.12.0"
+    ext.recyclerview_version = "1.2.0"
+    ext.cardview_version = "1.0.0"
     repositories {
         google()
         jcenter()

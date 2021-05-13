@@ -2,7 +2,6 @@ package com.example.camera.fragments
 
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
@@ -12,9 +11,9 @@ import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import androidx.navigation.Navigation
+import androidx.navigation.fragment.findNavController
+import com.bumptech.glide.Glide
 import com.example.camera.MainActivity
-import com.example.camera.R
 import com.example.camera.databinding.FragmentCameraBinding
 import java.io.File
 import java.text.SimpleDateFormat
@@ -25,6 +24,7 @@ import java.util.concurrent.Executors
 class CameraFragment : Fragment() {
 
     private lateinit var binding: FragmentCameraBinding
+    private lateinit var cameraProvider: ProcessCameraProvider
     private lateinit var imageCapture: ImageCapture
     private lateinit var preview: Preview
     private lateinit var outputFileDirectory: File
@@ -33,7 +33,7 @@ class CameraFragment : Fragment() {
     private val viewFinder by lazy { binding.viewFinder }
     private val captureButton by lazy { binding.captureButton }
     private val switchButton by lazy { binding.switchButton }
-    private val galleryButton by lazy { binding.galleryButton }
+    private val thumbnail by lazy { binding.thumbnail }
 
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -50,13 +50,15 @@ class CameraFragment : Fragment() {
         return binding.root
     }
 
-
+    /**
+     * Check if user has all permission when fragment resume
+     */
     override fun onResume() {
         super.onResume()
         // User may change permissions before resume
         if (!PermissionsFragment.hasPermissions(requireContext())) {
-            Navigation.findNavController(requireActivity(), R.id.nav_host_fragment)
-                .navigate(CameraFragmentDirections.actionCameraFragmentToPermissionsFragment())
+            //Navigation.findNavController(requireActivity(), R.id.nav_host_fragment)
+            findNavController().navigate(CameraFragmentDirections.actionCameraFragmentToPermissionsFragment())
         }
     }
 
@@ -65,24 +67,41 @@ class CameraFragment : Fragment() {
 
         outputFileDirectory = MainActivity.getOutputFileDirectory(requireContext())
 
+
         viewFinder.post {
 
             updateCameraUI()
 
-            bindCameraUseCases()
+            setUpCamera()
         }
 
     }
 
+    /**
+     * Update UI and set clickListener for each button
+     */
     private fun updateCameraUI() {
 
+        updateSwitchButton()
+
+        // Update gallery thumbnail
+        outputFileDirectory.listFiles { file ->
+            file.extension.toUpperCase(Locale.ROOT) in WHITELIST_EXTENSION
+        }?.maxOrNull()?.let {
+            setGalleryThumbnail(Uri.fromFile(it))
+        }
+
+        // Change lensFacing and rebind camera useCases
         switchButton.setOnClickListener {
             // Change lensFacing and rebind camera use cases
             lensFacing =
                 if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT
                 else CameraSelector.LENS_FACING_BACK
+
             bindCameraUseCases()
         }
+
+        // Capture image and store it in the output file directory
         captureButton.setOnClickListener {
             // Get a stable reference of the modifiable image capture use case
             imageCapture.let { imageCapture ->
@@ -108,6 +127,9 @@ class CameraFragment : Fragment() {
                         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                             val savedUri = outputFileResults.savedUri ?: Uri.fromFile(photoFile)
                             Log.d(TAG, "Photo capture succeed: $savedUri (file path: $photoFile)")
+
+                            // After capture an image, update thumbnail with file's uri
+                            setGalleryThumbnail(savedUri)
                         }
 
                         override fun onError(exception: ImageCaptureException) {
@@ -115,53 +137,99 @@ class CameraFragment : Fragment() {
                         }
                     })
             }
+        }
+
+        // todo: I need a new fragment to show my pictures
+        thumbnail.setOnClickListener {
 
         }
     }
 
-    private fun bindCameraUseCases() {
-
+    /**
+     * Create cameraProvider, then bind camera useCases
+     */
+    private fun setUpCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
-        cameraProviderFuture.addListener(Runnable {
-            val cameraProvider = cameraProviderFuture.get()
+        cameraProviderFuture.addListener({
 
-            // Use camera provider to check which camera does the device have
+            cameraProvider = cameraProviderFuture.get()
+
             lensFacing = when {
                 cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.LENS_FACING_BACK
                 cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.LENS_FACING_FRONT
-                else -> throw IllegalStateException("No camera find!")
+                else -> throw IllegalStateException("No camera was found.")
             }
 
-            val cameraSelector = CameraSelector.Builder()
-                .requireLensFacing(lensFacing)
-                .build()
+            bindCameraUseCases()
 
-            preview = Preview.Builder()
-                .build()
-            preview.setSurfaceProvider(viewFinder.surfaceProvider)
-
-            imageCapture = ImageCapture.Builder().build()
-
-            cameraProvider.unbindAll()
-            try {
-                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
-            } catch (e: Exception) {
-                Toast.makeText(requireContext(), "Bind camera use case failed.", Toast.LENGTH_LONG)
-                    .show()
-            }
         }, ContextCompat.getMainExecutor(requireContext()))
     }
+
+    /**
+     * Create cameraSelector and useCases(preview, imageCapture, imageAnalysis)
+     * unbind previous useCases, rebind with new one.
+     */
+    private fun bindCameraUseCases() {
+
+        val cameraSelector = CameraSelector.Builder()
+            .requireLensFacing(lensFacing)
+            .build()
+
+        preview = Preview.Builder()
+            .build()
+        preview.setSurfaceProvider(viewFinder.surfaceProvider)
+
+        imageCapture = ImageCapture.Builder().build()
+
+        cameraProvider.unbindAll()
+        try {
+            camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "Bind camera use case failed.", Toast.LENGTH_LONG)
+                .show()
+        }
+
+    }
+
+    /**
+     * Set gallery thumbnail with file uri
+     */
+    private fun setGalleryThumbnail(uri: Uri) {
+        Glide.with(thumbnail).load(uri).centerCrop().into(thumbnail)
+    }
+
+    /**
+     * If user has both back and front camera, then display switch button,
+     * else set it invisible
+     */
+    private fun updateSwitchButton() {
+        switchButton.visibility = if (hasBackCamera() && hasFrontCamera()) View.VISIBLE
+        else View.GONE
+    }
+
+    /**
+     * Check if has back camera
+     */
+    private fun hasBackCamera() = cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+
+    /**
+     * Check if has front camera
+     */
+    private fun hasFrontCamera() = cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
 
 
     companion object {
         private const val TAG = "CameraFragment"
+
+        // String in the single quote do not map to real number
         private const val FILE_NAME = "'IMG'_yyyyMMdd_HHmmss'.jpg'"
         private const val PHOTO_EXTENSION = ".jpg"
-        private fun createFile(baseFolder: File, format: String, extension: String) =
-            File(
-                baseFolder,
-                SimpleDateFormat(FILE_NAME, Locale.CHINA)
-                    .format(System.currentTimeMillis())
-            )
+
+        private val WHITELIST_EXTENSION = arrayOf("JPG")
+
+        private fun createFile(baseFolder: File, format: String, extension: String) = File(
+            baseFolder,
+            SimpleDateFormat(FILE_NAME, Locale.CHINA).format(System.currentTimeMillis())
+        )
     }
 }
